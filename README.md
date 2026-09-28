@@ -1,39 +1,150 @@
 # Mimik
 
-A real-time facial expression detection demo built with JavaScript and face-api.js. Runs entirely in the browser, keeping camera footage on your device.
+**Explore facial expressions in real time, right in your browser.**
+
+Mimik is a lightweight webcam demo built with vanilla JavaScript and face-api.js. It locates a face, draws a bounding box, and displays live scores for seven expression classes—all on your device.
+
+No model training, API key, backend inference service, or build step is required.
+
+> Mimik predicts visible facial expressions, not a person's actual emotions. Its scores are model outputs, not measures of emotional state or accuracy.
 
 ## Features
 
-- Start and stop your webcam with a single button.
-- Detect one face and draw its bounding box.
-- Show scores for seven facial expression classes.
-- Stop the camera when you leave the tab.
-- Process video locally without recording or uploading it.
+- **Live face detection** with a bounding box over the camera preview.
+- **Seven expression classes:** happy, neutral, sad, surprised, angry, fearful, and disgusted.
+- **Live score breakdown** and an “Uncertain” label when no expression score reaches 50%.
+- **Explicit camera controls:** start, stop, and automatically release the camera when the tab is hidden or the page is left.
+- **On-device processing:** no video recording or image uploads in the application code.
+- **Responsive English interface** with camera permission, loading, and error messages.
 
-Expression predictions are experimental and do not indicate how a person actually feels. Model scores are not accuracy measurements.
+## Quick start
 
-## Run locally
+### Requirements
 
-With Python 3 installed, run from the project folder:
+- Git to clone the repository, or download its ZIP from GitHub.
+- Python 3 for the example local server below, or any static HTTP server.
+- A webcam and a browser that supports camera access and TensorFlow.js execution.
+
+### Run locally
 
 ```sh
-python3 -m http.server 8000 --directory dist
+git clone https://github.com/meltemyanoglu/mimik.git
+cd mimik
+python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 ```
 
-Open http://localhost:8000 and allow camera access. A deployed version must use HTTPS for camera access.
+Open **[http://localhost:8000](http://localhost:8000)**, click **Start camera**, and allow camera access when prompted. Face the camera in a well-lit space with one face visible.
 
-No build step or training dataset is required. Pretrained model files are included.
+Click **Stop camera** to end the session. Stop the local server with `Ctrl+C` in its terminal.
+
+Serve the app through localhost rather than opening `index.html` directly. Deployed camera access requires HTTPS. The library and pretrained models are included in the repository, so no npm installation or separate model download is needed.
+
+## How it works
+
+```text
+Webcam video
+    ↓
+Tiny Face Detector → face location
+    ↓
+Face Expression Net → seven expression scores
+    ↓
+Canvas bounding box + live results panel
+```
+
+1. The app loads the pretrained models from `dist/models/`.
+2. The browser requests camera access through `getUserMedia()`; audio is disabled.
+3. `detectSingleFace()` locates one face, then `.withFaceExpressions()` estimates expression scores.
+4. The app draws the detected box and displays the highest-scoring expression, or “Uncertain” if its score is below `0.5`.
+5. After each analysis finishes, the app waits 140 ms before starting the next one. Actual update speed depends on the device and browser; this is not a fixed frame rate.
+
+The core inference call in `dist/app.js` is:
+
+```javascript
+const result = await faceapi
+  .detectSingleFace(
+    video,
+    new faceapi.TinyFaceDetectorOptions({
+      inputSize: 224,
+      scoreThreshold: 0.5,
+    }),
+  )
+  .withFaceExpressions();
+```
+
+The detector's `scoreThreshold` controls face detection acceptance. The separate expression threshold controls when the UI shows “Uncertain.”
+
+## Built with
+
+| Component | Purpose |
+| --- | --- |
+| HTML and CSS | Page structure, responsive layout, and styling |
+| Vanilla JavaScript | Camera lifecycle, inference loop, and UI updates |
+| face-api.js 0.22.2 | Face detection and expression classification APIs |
+| TensorFlow.js, through face-api.js | Model computation in the browser |
+| Tiny Face Detector | Single-face localization |
+| Face Expression Net | Expression classification |
+| Canvas API | Face bounding-box overlay |
+
+The two model weight files total approximately **0.5 MB**, excluding the library and other assets. This project uses pretrained models; it does not train or fine-tune them.
 
 ## Project structure
 
-- `dist/index.html`: page structure and text
-- `dist/style.css`: layout and styling
-- `dist/app.js`: camera controls, inference and results
-- `dist/models/`: pretrained face detection and expression model weights
-- `dist/vendor/`: bundled face-api.js library and its license
+```text
+mimik/
+├── dist/
+│   ├── index.html          # Page structure, labels, and metadata
+│   ├── style.css           # Layout, colors, and responsive styles
+│   ├── app.js              # Camera controls, inference, and results
+│   ├── models/             # Pretrained weights and their manifests
+│   └── vendor/             # Bundled face-api.js and its license
+├── .vscode/settings.json   # Project formatting preferences
+├── .openai/hosting.json    # Existing Sites deployment configuration
+├── .gitignore
+├── LICENSE
+└── README.md
+```
 
-## Technology and credits
+`dist/` contains the editable application source and is served directly. Despite its name, it is not generated by a build process.
 
-Uses HTML, CSS, JavaScript and [face-api.js](https://github.com/justadudewhohacks/face-api.js) 0.22.2, built on TensorFlow.js. Face detection uses Tiny Face Detector; expression classification uses Face Expression Net.
+### Where to make changes
 
-The bundled face-api.js license is preserved in `dist/vendor/LICENSE.face-api.txt`. Pretrained weights originate from the face-api.js repository.
+- **Text and page structure:** `dist/index.html`.
+- **Colors, spacing, and layout:** `dist/style.css`.
+- **Camera behavior, expression labels, thresholds, and update timing:** `dist/app.js`.
+
+The files under `vendor/` and `models/` are third-party dependencies; they normally do not need manual editing. The `.openai/` configuration is used for the existing Sites deployment and is not required to run locally. It does not mean the app uses an OpenAI model or API.
+
+## Privacy and limitations
+
+The application processes camera frames in the browser. It does not request microphone access, record video, upload frames, or persist expression results. The web server still receives ordinary requests for the page, scripts, and model files.
+
+- Designed for **one face at a time**, not multi-person tracking or identity recognition.
+- Lighting, face angle, occlusion, camera quality, and device performance can affect results.
+- Expression labels can be wrong and do not establish a person's feelings, intentions, or mental health.
+- Displayed percentages are expression-class scores, not validated accuracy figures.
+- No application-specific accuracy benchmark has been performed.
+
+## Troubleshooting
+
+| Problem | What to try |
+| --- | --- |
+| Camera permission denied | Allow camera access in the browser's site settings, then try again. |
+| No camera found | Check that a webcam is connected and available to the browser. |
+| Camera cannot start | Close other applications using the camera and check operating-system camera permissions. |
+| Camera unavailable in an embedded browser | Open the page in a standalone browser such as Chrome or Safari. |
+| Models fail to load | Serve the complete `dist/` folder and confirm that `models/` and `vendor/` are accessible. |
+| “Looking for a face…” persists | Improve lighting, face the camera, and keep one unobstructed face in view. |
+| Camera stops after switching tabs | This is intentional. Return to the page and click **Start camera** again. |
+
+## Deployment
+
+Upload the contents of `dist/` to a static host that supports HTTPS. Preserve the `models/` and `vendor/` directory structure so relative asset paths continue to work. No server-side inference or environment variables are required.
+
+## License and credits
+
+This repository is licensed under the **[Apache License 2.0](LICENSE)**. Third-party components retain their own licenses.
+
+- [face-api.js](https://github.com/justadudewhohacks/face-api.js) supplies the browser library and pretrained models used here.
+- Its bundled MIT license is preserved in [dist/vendor/LICENSE.face-api.txt](dist/vendor/LICENSE.face-api.txt).
+
+Mimik is an educational project for exploring how pretrained computer-vision models can be integrated into an interactive application.
